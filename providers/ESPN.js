@@ -664,8 +664,20 @@ module.exports = {
     return null
   },
 
+  // March Madness is a tournament-only ESPN group.
+  isMarchMadnessSeason: function (date) {
+    var day = moment(date)
+    if (!day.isValid()) return false
+    var month = day.month() + 1
+    return (month === 3 && day.date() >= 10) || (month === 4 && day.date() <= 15)
+  },
+
   async getScores(payload, gameDate, callback) {
     var self = this
+    if (payload.league === 'NCAAM_MM' && !this.isMarchMadnessSeason(gameDate)) {
+      callback([], payload.index, true)
+      return
+    }
 
     var primaryDate = moment(gameDate).format('YYYYMMDD')
     var MLBurl = 'https://mastapi.mobile.mlbinfra.com/api/epg/v3/search?date='
@@ -1196,6 +1208,10 @@ module.exports = {
     var results = {}
     var now = Date.now()
     var CACHE_TTL_MS = 6 * 60 * 60 * 1000
+    if (league === 'NCAAM_MM' && !this.isMarchMadnessSeason(moment().add(payload.debugHours || 0, 'hours').add(payload.debugMinutes || 0, 'minutes'))) {
+      callback(results, payload)
+      return
+    }
 
     var leaguePath = this.getLeaguePath(league)
     if (!leaguePath || leaguePath.includes('scorepanel')) {
@@ -1207,7 +1223,7 @@ module.exports = {
       var team = teams[i]
       var cacheKey = league + ':' + team
       var cached = this.teamScheduleCache[cacheKey]
-      if (cached && (now - cached.fetchedAt) < CACHE_TTL_MS) {
+      if (cached && cached.nextGame && moment(cached.nextGame.gameDate).isAfter(moment().add(payload.debugHours || 0, 'hours').add(payload.debugMinutes || 0, 'minutes')) && (now - cached.fetchedAt) < CACHE_TTL_MS) {
         results[team] = cached.nextGame
         continue
       }
@@ -1246,9 +1262,10 @@ module.exports = {
     var nowMoment = moment().add(payload.debugHours || 0, 'hours').add(payload.debugMinutes || 0, 'minutes')
 
     var future = body.events.filter(function (event) {
-      if (!event.date) return false
+      if (!event.date || !moment(event.date).isValid()) return false
       if (!moment(event.date).isAfter(nowMoment)) return false
       var comp = event.competitions && event.competitions[0]
+      if (!comp || !Array.isArray(comp.competitors) || comp.competitors.length < 2) return false
       var typeObj = comp && comp.status && comp.status.type
       if (typeObj && typeObj.completed) return false
       // Exclude cancelled/postponed
@@ -1270,8 +1287,8 @@ module.exports = {
     }
 
     var timeFormat = (config.timeFormat === 24) ? 'H:mm' : 'h:mm a'
-    var dateLabel = moment(comp.date).tz(localTZ).format('ddd, MMM D')
-    var timeLabel = moment(comp.date).tz(localTZ).format(timeFormat)
+    var dateLabel = moment(game.date).tz(localTZ).format('ddd, MMM D')
+    var timeLabel = moment(game.date).tz(localTZ).format(timeFormat)
 
     var getLogo = function (tm) {
       if (!tm) return ''
@@ -1310,7 +1327,7 @@ module.exports = {
       vTeamLogoUrl: getLogo(vData.team),
       playoffStatus: '',
       baseballSituation: null,
-      gameDate: comp.date,
+      gameDate: game.date,
     }
   },
 
