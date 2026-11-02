@@ -1368,29 +1368,26 @@ Module.register('MMM-MyScoreboard', {
   },
 
   makeTeamList: function (inst, league, teams, groups) {
-    var teamList = []
-
-    if (teams != null) {
-      teamList = teams
-    }
+    var teamList = teams != null ? teams.slice() : [];
 
     if (groups != null) {
       for (var i = 0; i < groups.length; i++) {
-        var group = inst.groups[league][groups[i]]
+        var group = inst.groups[league][groups[i]];
         if (group != null) {
           group.forEach(function (team) {
-            teamList.push(team)
-          })
+            if (!teamList.includes(team)) {
+              teamList.push(team);
+            }
+          });
         }
       }
     }
-
     if (teamList.length == 0) {
-      return null
+      return null;
     }
-    return teamList
+    return teamList;
   },
-
+ 
   getScores: function () {
     var gameDate = moment().add(this.config.debugHours, 'hours').add(this.config.debugMinutes, 'minutes') // get today's date
     var whichDay = { today: false, yesterday: 'no' }
