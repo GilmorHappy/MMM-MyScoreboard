@@ -1164,6 +1164,23 @@ Module.register('MMM-MyScoreboard', {
     }
     if (!sport) return
 
+    // Tournament schedule uses the same team endpoint as regular NCAAM.
+    // Suppress it outside tournament season so regular-season games do not
+    // appear twice under separate league headings.
+    if (sport.league === 'NCAAM_MM') {
+      var today = moment().add(this.config.debugHours, 'hours').add(this.config.debugMinutes, 'minutes')
+      var month = today.month() + 1
+      var inTournamentWindow = (month === 3 && today.date() >= 10) ||
+        (month === 4 && today.date() <= 15)
+      if (!inTournamentWindow) {
+        if (this.upcomingGames[label]) {
+          delete this.upcomingGames[label]
+          this.updateDom()
+        }
+        return
+      }
+    }
+
     // Skip non-ESPN providers for v1; node_helper will respond with unsupported:true anyway,
     // but this saves a socket round-trip.
     var provider = this.supportedLeagues[sport.league] && this.supportedLeagues[sport.league].provider
